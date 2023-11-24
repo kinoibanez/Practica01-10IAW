@@ -7,8 +7,10 @@ apt update
 
 #Actualizamos los paquetes de la máquina 
 
+
 #apt upgrade -y
 
+source  .env
 # Instalamos el servidor web apache A.
 
 apt install apache2 -y
@@ -32,7 +34,6 @@ sudo cp ../conf/load-balancer.conf /etc/apache2/sites-available
 
 sed -i "s/IP_HTTP_SERVER_1/$IP_HTTP_SERVER_1/" /etc/apache2/sites-available/load-balancer.conf
 sed -i "s/IP_HTTP_SERVER_2/$IP_HTTP_SERVER_2/" /etc/apache2/sites-available/load-balancer.conf
-
 
 #Habilitamos el virtualhost que hemos creado.
 
