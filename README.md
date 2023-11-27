@@ -28,7 +28,207 @@ Este repositorio es para la Práctica 1 apartado 10 de IAW
 
 - El primero que tenemos es el *_install_lamp_frontend_* que tendremos que ejecutar en ambas máquinas FRONT, cuidado con equivocarse.
 
-    ``` 
+    ```
+    #!/bin/bash
+
+    #Esto muestra todos los comandos que se van ejecutando
+    set -x 
+    #Actualizamos los repositorios
+    apt update
+
+    #Actualizamos los paquetes de la máquina 
+
+    #apt upgrade -y
+
+    # Instalamos el servidor web apache A.
+
+    apt install apache2 -y
+
+    # Instalamos PHP.
+
+    sudo apt install php libapache2-mod-php php-mysql -y
+
+    #Copiamos el directorio 000-default.conf (Archivo de configuración de apache2)
+
+    cp ../conf/000-default.conf /etc/apache2/sites-available/000-default.conf
+
+    # Instalamos PHP.
+
+    sudo apt install php libapache2-mod-php php-mysql -y
+
+    # Reiniciamos el servicio (apache)
+
+    systemctl restart  apache2
+
+    # Modificamos el propietario y el grupo del directorio /var/www/html
+
+    chown -R www-data:www-data /var/www/html
+    ```
+
+    Instalamos apache2 como hemos hecho anteriormente y modificamos el usuario *www_data_* 
+
+
+- El segundo que encontramos en el *_install_lamp_backend_* en el que como hemos hecho en otras prácticas instala `MySql Server` y modificamos las variables que tenemos en nuestro `.env` ya definidas.
+
+
+    ```
+    #!/bin/bash
+
+    #Esto muestra todos los comandos que se van ejecutando
+    set -x 
+    #Actualizamos los repositorios
+    apt update
+
+    #Añadimos el source
+
+    source .env
+
+    #Actualizamos los paquetes de la máquina 
+
+    #apt upgrade -y
+
+    # Instalamos Mysql L.
+
+    sudo apt install mysql-server -y
+
+    #Configuramos MYSQL para que sólo acepte conexiones desde la IP privada
+
+    sed -i "s/127.0.0.1/$MYSQL_PRIVATE_IP/" /etc/mysql/mysql.conf.d/mysqld.cnf
+
+
+    #Creamos el usuario en MYSQL
+
+    DROP USER IF EXISTS '$DB_USER'@'$FRONTEND_PRIVATE_IP';
+    CREATE USER '$DB_USER'@'$FRONTEND_PRIVATE_IP' IDENTIFIED BY '$DB_PASS';
+    GRANT ALL PRIVILEGES ON '$DB_NAME'.* TO '$DB_USER'@'$FRONTEND_PRIVATE_IP';
+
+    #Reiniciamos el servicio de mysql
+
+    systemctl restart mysql
+    ```
+### *_Install_lamp_* del Balanceador.
+
+- Ahora es cuando entra la nueva configuración del nuevo script, este script tiene la función es modificar un archivo llamado *_load-balancer.conf_* que anteriormente tendremos que haber creado, para así poder indicar las dos IPS que tienen nuestros FRONT para poder redirigirte cada vez a uno cada vez que refresques la página. Es lioso, lo sé, pero podemos verlo de manera más simple a través del script.
+
+    1. Nuestro archivo `.env` configurado con las IPS privadas de nuestro front end 1 y 2.
+
+         ![](images/cap2.png)
+    
+    2. En el script haremos uso de *_sed -i_* que como bien sabemos sirve para buscar una cadena y remplazarla por la variable $ que nosotros queramos. Acordarse de tener configurado el apartado anterior.
+
+    3. Como paso siguiente tendremos que añadir una serie de módulos necesarios para configurar el balanceador como proxy inverso, que son los siguientes:
+
+        ```
+        sudo a2enmod proxy
+        sudo a2enmod proxy_http
+        sudo a2enmod proxy_balancer
+        ```
+    Que cada uno significa lo siguiente:
+
+    ![](images/cap3.png)
+
+    4. El script completo que es el siguiente, aunque antes de poder lanzarlo también podemos lanzar otros módulos que encontramos en la [Práctica 1.10 de Jose Juan apartado 1.3](https://josejuansanchez.org/iaw/practica-01-10/index.html)
+
+        ``` 
+        #!/bin/bash
+
+        #Esto muestra todos los comandos que se van ejecutando
+        set -x 
+        #Actualizamos los repositorios
+        apt update
+
+        #Actualizamos los paquetes de la máquina 
+
+
+        #apt upgrade -y
+
+        source  .env
+        # Instalamos el servidor web apache A.
+
+        apt install apache2 -y
+
+        #Habilitamos los modulos necesarios para configurar apache como proxy inverso.
+
+        sudo a2enmod proxy
+        sudo a2enmod proxy_http
+        sudo a2enmod proxy_balancer
+
+        #Habilitamos el balanceo de carga Round Robin
+
+        sudo a2enmod lbmethod_byrequests
+
+
+        #copiamos el archivo de configuración 
+
+        sudo cp ../conf/load-balancer.conf /etc/apache2/sites-available
+
+        #Remplazamos los valores de la plantilla con la dirección IP de los frontales 
+
+        sed -i "s/IP_HTTP_SERVER_1/$IP_HTTP_SERVER_1/" /etc/apache2/sites-available/load-balancer.conf
+        sed -i "s/IP_HTTP_SERVER_2/$IP_HTTP_SERVER_2/" /etc/apache2/sites-available/load-balancer.conf
+
+        #Habilitamos el virtualhost que hemos creado.
+
+        sudo a2ensite load-balancer.conf 
+
+        #Deshabilitamos el que tiene apache por defecto.
+
+        sudo a2dissite 000-default.conf 
+
+        #Reiniciamos el servicio
+
+        sudo systemctl restart apache2
+
+        ```
+
+- Cada linea va comentada con la función que hace cada linea del código ;D.
+
+    *_NOTA_*: Puede ser que lo lances y no funcione el balanceo... pero ¿Por qué?, esto se debe a que anteriormente hemos utilizado los front para otras prácticas, entonces el archivo *_index.html_* estará erroneo, por eso es recomendable hacer un `rm -rf` de ese archivo o borrar todo por completo haciendo `sudo nano` en cada uno de los front y directamente poner:
+
+    ```
+    Front End 1 Y Front End 2
+    ```
+
+    Si todo lo anterior se ha ejecutado correctamente, si accedemos a nuestro archivo *_load-balancer.conf_* tendra que estar de la siguiente con la IP privada de cada front.
+
+    ![](images/cap4.png)
+
+### Scripts deploy.
+
+- El *_deploy_backend_* como bien sabemos la principal configuración que tiene es borrar y volver a crear la base de datos cada vez que ejecutemos su script.
+
+
+    ```
+
+    #!/bin/bash
+
+    #Esto muestra todos los comandos que se van ejecutando
+    set -ex 
+    #Actualizamos los repositorios
+    apt update
+
+    #Actualizamos los paquetes de la máquina 
+
+    #apt upgrade -y
+
+    #Incluimos las variables del archivo .env
+
+    source .env
+    # Creamos la base de datos y el usuario de base de datos.
+
+    mysql -u root <<< "DROP DATABASE IF EXISTS $WORDPRESS_DB_NAME"
+    mysql -u root <<< "CREATE DATABASE $WORDPRESS_DB_NAME"
+    mysql -u root <<< "DROP USER IF EXISTS $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
+    mysql -u root <<< "CREATE USER $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'"
+    mysql -u root <<< "GRANT ALL PRIVILEGES ON $WORDPRESS_DB_NAME.* TO $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
+    ```
+
+    Pero estos scripts ya lo hemos usado en prácticas anteriores que encontramos en mi misma página de GitHub.
+
+
+- El segundo script que tenemos que lanzar es el que hemos utilizado en prácticas anteriores es el *_deploy_frontend_*, este script deberemos lanzarlo en los dos FrontEnd que tenemos, de manera que dos tengan instalado apache y sus correspondientes pluggins.
+
+    ```
     #!/bin/bash
 
     #Esto muestra todos los comandos que se van ejecutando
@@ -125,51 +325,8 @@ Este repositorio es para la Práctica 1 apartado 10 de IAW
     #Modificamos los permisos de /var/www/html
 
     chown -R www-data:www-data /var/www/html
-
     ```
 
     Como podemos observar cada linea de código va comentada, en este script estamos lanzando WordPress con su respectiva configuración como pueden ser plugins, temas, etc... e incluso en el apartado final estamos cambiando la *URL* para que el acceso a través de *_wp-admin_* sea secreto solo para nosotros.
 
 
-- El *_deploy_backend_* como bien sabemos la principal configuración que tiene es borrar y volver a crear la base de datos cada vez que ejecutemos su script.
-
-
-    ```
-
-    #!/bin/bash
-
-    #Esto muestra todos los comandos que se van ejecutando
-    set -ex 
-    #Actualizamos los repositorios
-    apt update
-
-    #Actualizamos los paquetes de la máquina 
-
-    #apt upgrade -y
-
-    #Incluimos las variables del archivo .env
-
-    source .env
-    # Creamos la base de datos y el usuario de base de datos.
-
-    mysql -u root <<< "DROP DATABASE IF EXISTS $WORDPRESS_DB_NAME"
-    mysql -u root <<< "CREATE DATABASE $WORDPRESS_DB_NAME"
-    mysql -u root <<< "DROP USER IF EXISTS $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
-    mysql -u root <<< "CREATE USER $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL IDENTIFIED BY '$WORDPRESS_DB_PASSWORD'"
-    mysql -u root <<< "GRANT ALL PRIVILEGES ON $WORDPRESS_DB_NAME.* TO $WORDPRESS_DB_USER@$IP_CLIENTE_MYSQL"
-    ```
-
-    Pero estos scripts ya lo hemos usado en prácticas anteriores que encontramos en mi misma página de GitHub.
-
-### *_Install_lamp_* del Balanceador.
-
-- Ahora es cuando entra la nueva configuración del nuevo script, este script tiene la función es modificar un archivo llamado *_load-balancer.conf_* que anteriormente tendremos que haber creado, para así poder indicar las dos IPS que tienen nuestros FRONT para poder redirigirte cada vez a uno cada vez que refresques la página. Es lioso, lo sé, pero podemos verlo de manera más simple a través del script.
-
-    1. Nuestro archivo `.env` configurado con las IPS privadas de nuestro front end 1 y 2.
-
-         ![](images/cap2.png)
-    
-    2. En el script haremos uso de *_sed -i_* que como bien sabemos sier
-### Scripts deploy.
-
-- El primer script que tenemos que hemos utilizado en prácticas anteriores es el *_deploy_frontend_*, este script deberemos lanzarlo en los dos FrontEnd que tenemos, de manera que dos tengan instalado apache y sus correspondientes pluggins.
