@@ -330,3 +330,65 @@ Este repositorio es para la Práctica 1 apartado 10 de IAW
     Como podemos observar cada linea de código va comentada, en este script estamos lanzando WordPress con su respectiva configuración como pueden ser plugins, temas, etc... e incluso en el apartado final estamos cambiando la *URL* para que el acceso a través de *_wp-admin_* sea secreto solo para nosotros.
 
 
+### Script *_setup_lestencrypt_certificate_*.
+
+- Como  en prácticas anteriores la funciolidad de este script es para poder instalar la herramienta `cerbot`
+
+    ```
+
+    #!/bin/bash
+
+    #Esto muestra todos los comandos que se van ejecutando
+    set -ex 
+    #Actualizamos los repositorios
+    apt update
+
+    #Actualizamos los paquetes de la máquina 
+
+    #apt upgrade -y
+
+    #Importamos el archivo de variables .env
+
+    source .env
+
+    #Instalamos y Actualizamos snapd.
+
+    snap install core
+    snap refresh core
+
+    # Eliminamos cualquier instalación previa de certobot con apt.
+
+    apt remove certbot
+
+    # Instalamos el cliente de Certbot con snapd.
+
+    snap install --classic certbot
+
+    # Creamos un alias para la aplicación cerbot.
+
+    sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+
+    # Obtenemos el certificado y configuramos el servidor web Apache.
+
+    #sudo certbot --apache
+
+    #Ejecutamos el comando certbot.
+    certbot --apache -m $CERTIFICATE_EMAIL --agree-tos --no-eff-email -d $CERTIFICATE_DOMAIN --non-interactive
+
+
+    #Con el siguiente comando podemos comprobar que hay un temporizador en el sistema encargado de realizar la renovación de los certificados de manera automática.
+
+    #systemctl list-timers
+    ```
+
+### Final de la práctica y comprobamos que funciona.
+
+- Si todo lo anterior se ha configurado de manera correcta, si accedemos a nuestro nombre del dominio o la ip pública del balanceador nos saldrá lo que tengamos escrito dentro de nuestro archivo index.html
+
+1. Con el balanceado al front end 1.
+
+    ![](images/cap5.png)
+
+2. Con el balanceado al front end 2.
+
+    ![](images/cap6.png)
