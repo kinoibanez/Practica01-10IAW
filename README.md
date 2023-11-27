@@ -392,3 +392,29 @@ Este repositorio es para la Práctica 1 apartado 10 de IAW
 2. Con el balanceado al front end 2.
 
     ![](images/cap6.png)
+
+
+
+#### Apuntes varios
+
+- Como sabemos en prácticas anteriores tenemos que modificar la ip a través de [No-IP](https://www.noip.com/es-MX)
+
+- Para comprobar errores de apache ya sabemos que es en `/var/log/apache2`
+
+- Directorio de apache `var/www/html`
+
+- Algo que no se ha comentado pero tenemos que tener también es nuestro archivo `.htaccess` que tendrá que tener la siguiente estructura.
+
+    ```
+    # BEGIN WordPress
+    <IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteRule ^index\.php$ - [L]
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule . /index.php [L]
+    </IfModule>
+    # END WordPress
+
+    ```
